@@ -12,7 +12,7 @@ on:
         description: Release tag that holds xcode.zip
         required: true
       runner:
-        description: GitHub Mac to build on (macos-15 by default: it has Xcode 26 and starts at once; macos-26 queued)
+        description: "GitHub Mac to build on (macos-15 by default, which has Xcode 26 and starts at once; macos-26 queued)"
         required: false
 permissions:
   contents: read
