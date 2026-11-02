@@ -1,0 +1,70 @@
+# Throne Ladder to TestFlight: Unity on Windows exports the Xcode project (Editor/IosBuild.cs) and it is attached as
+# xcode.zip to a release of this repository; publishing the release builds it on GitHub's Mac, signs it automatically
+# with the App Store Connect key (Admin role: cloud signing) and uploads it. Secrets: ASC_KEY_P8 (the .p8 file's text),
+# ASC_KEY_ID, ASC_ISSUER_ID. Each run's number is the build number TestFlight needs to grow.
+name: TestFlight
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Release tag that holds xcode.zip
+        required: true
+permissions:
+  contents: read
+defaults:
+  run:
+    shell: bash
+jobs:
+  testflight:
+    runs-on: macos-15
+    timeout-minutes: 120
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      TEAM_ID: K955P6369G
+    steps:
+      - uses: actions/checkout@v4
+      - name: Xcode in use
+        run: xcodebuild -version
+      - name: Fetch the Xcode project
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release download "$TAG" -p xcode.zip -R "$GITHUB_REPOSITORY"
+          unzip -q xcode.zip -d xcode
+          rm xcode.zip
+          # Zipped on Windows: give the project's scripts and tools back the right to run.
+          find xcode -name "*.sh" -exec chmod +x {} +
+          [ -d xcode/Il2CppOutputProject/IL2CPP/build ] && chmod -R +x xcode/Il2CppOutputProject/IL2CPP/build || true
+      - name: App Store Connect key
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/keys"
+          printf '%s\n' "$ASC_KEY_P8" > "$RUNNER_TEMP/keys/AuthKey.p8"
+      - name: Build number
+        run: /usr/libexec/PlistBuddy -c "Set :CFBundleVersion ${{ github.run_number }}" xcode/Info.plist
+      - name: Archive
+        run: |
+          cd xcode
+          xcodebuild -project Unity-iPhone.xcodeproj -scheme Unity-iPhone -configuration Release \
+            -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/ThroneLadder.xcarchive" \
+            DEVELOPMENT_TEAM="$TEAM_ID" CODE_SIGN_STYLE=Automatic \
+            -allowProvisioningUpdates -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey.p8" \
+            -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}" \
+            archive > "$RUNNER_TEMP/archive.log" 2>&1 || { grep -E "error:|BUILD FAILED" "$RUNNER_TEMP/archive.log" | head -60; tail -n 80 "$RUNNER_TEMP/archive.log"; exit 1; }
+          tail -n 20 "$RUNNER_TEMP/archive.log"
+      - name: Sign and upload to TestFlight
+        run: |
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/ThroneLadder.xcarchive" -exportOptionsPlist ExportOptions.plist \
+            -exportPath "$RUNNER_TEMP/export" -allowProvisioningUpdates \
+            -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey.p8" \
+            -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}"
+      - name: Build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: archive-log
+          path: ${{ runner.temp }}/archive.log
+          if-no-files-found: ignore
