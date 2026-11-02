@@ -18,15 +18,20 @@ defaults:
     shell: bash
 jobs:
   testflight:
-    runs-on: macos-15
+    runs-on: macos-26
     timeout-minutes: 120
     env:
       TAG: ${{ github.event.release.tag_name || inputs.tag }}
       TEAM_ID: K955P6369G
     steps:
       - uses: actions/checkout@v4
-      - name: Xcode in use
-        run: xcodebuild -version
+      # App Store Connect takes only apps built with the iOS 26 SDK or later (Xcode 26): the newest Xcode 26 here.
+      - name: Xcode 26
+        run: |
+          x=$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -1)
+          [ -n "$x" ] || { echo "no Xcode 26 on this runner"; ls -d /Applications/Xcode*.app; exit 1; }
+          sudo xcode-select -s "$x"
+          xcodebuild -version
       - name: Fetch the Xcode project
         env:
           GH_TOKEN: ${{ github.token }}
