@@ -12,7 +12,7 @@ on:
         description: Release tag that holds xcode.zip
         required: true
       runner:
-        description: GitHub Mac to build on (macos-26 by default; macos-15 when that queue is long)
+        description: GitHub Mac to build on (macos-15 by default: it has Xcode 26 and starts at once; macos-26 queued)
         required: false
 permissions:
   contents: read
@@ -21,7 +21,7 @@ defaults:
     shell: bash
 jobs:
   testflight:
-    runs-on: ${{ inputs.runner || 'macos-26' }}
+    runs-on: ${{ inputs.runner || 'macos-15' }}
     timeout-minutes: 120
     env:
       TAG: ${{ github.event.release.tag_name || inputs.tag }}
