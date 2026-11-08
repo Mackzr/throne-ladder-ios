@@ -1,21 +1,24 @@
-# Throne Ladder to TestFlight: Unity on Windows exports the Xcode project (Editor/IosBuild.cs) and it is attached as
-# xcode.zip to a release of this repository; publishing the release builds it on GitHub's Mac, signs it automatically
-# with the App Store Connect key (Admin role: cloud signing) and uploads it. Secrets: ASC_KEY_P8 (the .p8 file's text),
-# ASC_KEY_ID, ASC_ISSUER_ID. Each run's number is the build number TestFlight needs to grow.
+# Simple Colonies to TestFlight: Unity on Windows exports the Xcode project (Editor/IosBuild.cs) and it is attached as
+# xcode.zip to a DRAFT release of this repository (publish.sh); the run is started by hand (workflow_dispatch, by someone
+# with write access) with that tag. On GitHub's Mac it is archived, signed automatically with the App Store Connect key
+# (Admin role: cloud signing) and uploaded. Secrets: ASC_KEY_P8 (the .p8 file's text), ASC_KEY_ID, ASC_ISSUER_ID. Each
+# run's number is the build number TestFlight needs to grow.
+# This repository is public (8 Nov 2026: GitHub Actions is free on public repositories). Nothing of the game is left in
+# it: drafts are never visible to the public, the draft is deleted with its tag once the build is on TestFlight, no
+# artifact is stored, and the logs show no secret (GitHub masks them; they are passed through the environment).
 name: TestFlight
+run-name: TestFlight ${{ inputs.tag }}
 on:
-  release:
-    types: [published]
   workflow_dispatch:
     inputs:
       tag:
-        description: Release tag that holds xcode.zip
+        description: Draft release tag that holds xcode.zip
         required: true
       runner:
         description: "GitHub Mac to build on (macos-15 by default, which has Xcode 26 and starts at once; macos-26 queued)"
         required: false
 permissions:
-  contents: read
+  contents: write       # (to read the draft release, and delete it once the build is uploaded)
 defaults:
   run:
     shell: bash
@@ -24,7 +27,7 @@ jobs:
     runs-on: ${{ inputs.runner || 'macos-15' }}
     timeout-minutes: 120
     env:
-      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+      TAG: ${{ inputs.tag }}
       TEAM_ID: K955P6369G
     steps:
       - uses: actions/checkout@v4
@@ -59,20 +62,23 @@ jobs:
         run: |
           cd xcode
           xcodebuild -project Unity-iPhone.xcodeproj -scheme Unity-iPhone -configuration Release \
-            -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/ThroneLadder.xcarchive" \
+            -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/SimpleColonies.xcarchive" \
             DEVELOPMENT_TEAM="$TEAM_ID" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
-            archive > "$RUNNER_TEMP/archive.log" 2>&1 || { grep -E "error:|BUILD FAILED" "$RUNNER_TEMP/archive.log" | head -60; tail -n 80 "$RUNNER_TEMP/archive.log"; exit 1; }
-          tail -n 20 "$RUNNER_TEMP/archive.log"
+            archive > "$RUNNER_TEMP/archive.log" 2>&1 || { grep -E "error:|BUILD FAILED" "$RUNNER_TEMP/archive.log" | head -60; exit 1; }
+          echo "archived"
       - name: Sign and upload to TestFlight
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
         run: |
-          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/ThroneLadder.xcarchive" -exportOptionsPlist ExportOptions.plist \
+          xcodebuild -exportArchive -archivePath "$RUNNER_TEMP/SimpleColonies.xcarchive" -exportOptionsPlist ExportOptions.plist \
             -exportPath "$RUNNER_TEMP/export" -allowProvisioningUpdates \
             -authenticationKeyPath "$RUNNER_TEMP/keys/AuthKey.p8" \
-            -authenticationKeyID "${{ secrets.ASC_KEY_ID }}" -authenticationKeyIssuerID "${{ secrets.ASC_ISSUER_ID }}"
-      - name: Build log on failure
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: archive-log
-          path: ${{ runner.temp }}/archive.log
-          if-no-files-found: ignore
+            -authenticationKeyID "$ASC_KEY_ID" -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+      # Nothing of the game stays here: the draft and its tag go once the build is on TestFlight (a failed run keeps the
+      # draft, never public, for a rerun).
+      - name: Remove the build from this repository
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release delete "$TAG" -R "$GITHUB_REPOSITORY" --yes --cleanup-tag
