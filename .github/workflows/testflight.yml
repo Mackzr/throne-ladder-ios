@@ -81,4 +81,5 @@ jobs:
         if: success()
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release delete "$TAG" -R "$GITHUB_REPOSITORY" --yes --cleanup-tag
+        # a draft has no tag, so --cleanup-tag can fail after the draft is gone: fine as long as the release no longer exists
+        run: gh release delete "$TAG" -R "$GITHUB_REPOSITORY" --yes --cleanup-tag || ! gh release view "$TAG" -R "$GITHUB_REPOSITORY" > /dev/null 2>&1
