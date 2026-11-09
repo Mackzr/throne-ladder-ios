@@ -1,0 +1,19 @@
+# Yuzu Spa Rush's Game Center setup in App Store Connect (D8): switches Game Center on for the app and adds its
+# leaderboards with .github/gamecenter.mjs (the game's ios-ci/gamecenter.mjs). Started by hand; safe to run again; no
+# Mac needed. Secrets: ASC_KEY_P8, ASC_KEY_ID, ASC_ISSUER_ID (the build key, never printed).
+name: Game Center setup
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Add what's missing
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: node .github/gamecenter.mjs
