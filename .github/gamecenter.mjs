@@ -14,7 +14,7 @@ const BOARDS = [
   { id: 'weekly_guests', name: 'Guests this week', submission: 'MOST_RECENT_SCORE' },
   { id: 'furthest_wave', name: 'Waves reached', submission: 'BEST_SCORE' },
   { id: 'weekly_soak', name: "This week's guests", submission: 'BEST_SCORE',
-    recurrence: { recurrenceStartDate: '2026-11-16T00:00:00Z', recurrenceDuration: 'P7D', recurrenceRule: 'FREQ=WEEKLY;INTERVAL=1' } },
+    recurrence: { recurrenceStartDate: '2026-11-16T00:00:00Z', recurrenceDuration: 'PT168H', recurrenceRule: 'FREQ=WEEKLY;INTERVAL=1' } },
 ];
 
 const b64u = b => Buffer.from(b).toString('base64url');
