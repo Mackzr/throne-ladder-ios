@@ -61,7 +61,17 @@ jobs:
       - name: Archive
         run: |
           cd xcode
-          xcodebuild -project Unity-iPhone.xcodeproj -scheme Unity-iPhone -configuration Release \
+          # Google's ads SDKs (Yuzu Spa Rush, AdMob, 11 Nov 2026) come from CocoaPods: an export with a Podfile installs its
+          # pods and archives the workspace; an export without one archives the project as before.
+          if [ -f Podfile ]; then
+            command -v pod > /dev/null || sudo gem install cocoapods --no-document
+            pod install --repo-update > "$RUNNER_TEMP/pods.log" 2>&1 || { tail -60 "$RUNNER_TEMP/pods.log"; exit 1; }
+            grep -E "Pod installation complete|Installing " "$RUNNER_TEMP/pods.log" | head -20
+            SOURCE="-workspace Unity-iPhone.xcworkspace"
+          else
+            SOURCE="-project Unity-iPhone.xcodeproj"
+          fi
+          xcodebuild $SOURCE -scheme Unity-iPhone -configuration Release \
             -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/SimpleColonies.xcarchive" \
             DEVELOPMENT_TEAM="$TEAM_ID" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
             archive > "$RUNNER_TEMP/archive.log" 2>&1 || { grep -E "error:|BUILD FAILED" "$RUNNER_TEMP/archive.log" | head -60; exit 1; }
