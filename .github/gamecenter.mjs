@@ -1,7 +1,8 @@
 // Yuzu Spa Rush's Game Center setup in App Store Connect (D8, owner: "well if its free do whatever"): switches Game
 // Center on for the app and adds the leaderboards the game reports to (Systems/Ranks.cs):
 //   weekly_guests  "Guests this week"  most recent score, highest first (the weekly board with placement rewards)
-//   furthest_wave  "Waves reached"     best score, highest first ((map − 1) × 50 + wave)
+//   furthest_wave  "Furthest map"      best score, highest first ((map − 1) × 50 + wave; was named "Waves reached")
+//   highest_power  "Highest power"     best score, highest first (the gear power, 11 Nov night)
 // Runs in the build repository (Mackzr/throne-ladder-ios, .github/workflows/gamecenter.yml) with its App Store Connect
 // key: env ASC_KEY_P8, ASC_KEY_ID, ASC_ISSUER_ID, never printed. Safe to run again: it only adds what's missing.
 import crypto from 'node:crypto';
@@ -12,7 +13,8 @@ const BUNDLE = 'com.sullifishstudios.yuzusparush';
 // placement rewards. weekly_guests stays (older builds report to it); read with the week scope it is the last 7 days.
 const BOARDS = [
   { id: 'weekly_guests', name: 'Guests this week', submission: 'MOST_RECENT_SCORE' },
-  { id: 'furthest_wave', name: 'Waves reached', submission: 'BEST_SCORE' },
+  { id: 'furthest_wave', name: 'Furthest map', submission: 'BEST_SCORE' },
+  { id: 'highest_power', name: 'Highest power', submission: 'BEST_SCORE' },
   { id: 'weekly_soak', name: "This week's guests", submission: 'BEST_SCORE',
     recurrence: { recurrenceStartDate: '2026-11-16T00:00:00Z', recurrenceDuration: 'PT168H', recurrenceRule: 'FREQ=DAILY;INTERVAL=7' } },
 ];
@@ -51,6 +53,15 @@ if (!gcd) {
 
 const existing = (await api('GET', `/v1/gameCenterDetails/${gcd.id}/gameCenterLeaderboards?limit=200`)).json?.data ?? [];
 const have = new Set(existing.map(l => l.attributes.vendorIdentifier));
+// Names that changed (allowed while a board is not live): its reference name and its en-GB name follow BOARDS.
+for (const b of BOARDS) {
+  const lb = existing.find(l => l.attributes.vendorIdentifier === b.id);
+  if (!lb || lb.attributes.referenceName === b.name) continue;
+  await api('PATCH', `/v1/gameCenterLeaderboards/${lb.id}`, { data: { type: 'gameCenterLeaderboards', id: lb.id, attributes: { referenceName: b.name } } });
+  const locs = (await api('GET', `/v1/gameCenterLeaderboards/${lb.id}/localizations?limit=50`)).json?.data ?? [];
+  for (const l of locs) if (l.attributes.name !== b.name) await api('PATCH', `/v1/gameCenterLeaderboardLocalizations/${l.id}`, { data: { type: 'gameCenterLeaderboardLocalizations', id: l.id, attributes: { name: b.name } } });
+  console.log('renamed:', b.id, '->', b.name);
+}
 for (const b of BOARDS) {
   if (have.has(b.id)) { console.log('leaderboard already there:', b.id); continue; }
   const lb = (await api('POST', '/v1/gameCenterLeaderboards', {
