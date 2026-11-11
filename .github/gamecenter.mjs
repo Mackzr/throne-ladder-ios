@@ -7,9 +7,14 @@
 import crypto from 'node:crypto';
 
 const BUNDLE = 'com.sullifishstudios.yuzusparush';
+// weekly_soak (11 Nov, owner: "Fix leaderboards in game"): the weekly board done properly, a recurring leaderboard, one
+// occurrence a week from Monday 00:00 UTC (the game's own week), so last week's final standings can be read for the
+// placement rewards. weekly_guests stays (older builds report to it); read with the week scope it is the last 7 days.
 const BOARDS = [
   { id: 'weekly_guests', name: 'Guests this week', submission: 'MOST_RECENT_SCORE' },
   { id: 'furthest_wave', name: 'Waves reached', submission: 'BEST_SCORE' },
+  { id: 'weekly_soak', name: "This week's guests", submission: 'BEST_SCORE',
+    recurrence: { recurrenceStartDate: '2026-11-16T00:00:00Z', recurrenceDuration: 'P7D', recurrenceRule: 'FREQ=WEEKLY;INTERVAL=1' } },
 ];
 
 const b64u = b => Buffer.from(b).toString('base64url');
@@ -51,7 +56,7 @@ for (const b of BOARDS) {
   const lb = (await api('POST', '/v1/gameCenterLeaderboards', {
     data: {
       type: 'gameCenterLeaderboards',
-      attributes: { referenceName: b.name, vendorIdentifier: b.id, defaultFormatter: 'INTEGER', submissionType: b.submission, scoreSortType: 'DESC' },
+      attributes: { referenceName: b.name, vendorIdentifier: b.id, defaultFormatter: 'INTEGER', submissionType: b.submission, scoreSortType: 'DESC', ...(b.recurrence ?? {}) },
       relationships: { gameCenterDetail: { data: { type: 'gameCenterDetails', id: gcd.id } } },
     },
   })).json.data;
