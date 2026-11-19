@@ -1,0 +1,43 @@
+# Copies an auto-renewing subscription in App Store Connect under a new product id (asc-copy-sub.mjs): the same group,
+# period, review note, localisations, territories, prices and review screenshot. Started by hand; adds only what's
+# missing, so it's safe to run again; it never deletes the original. Secrets: ASC_KEY_P8, ASC_KEY_ID, ASC_ISSUER_ID.
+name: Copy a subscription
+run-name: Copy ${{ inputs.from }} to ${{ inputs.to }}
+on:
+  workflow_dispatch:
+    inputs:
+      bundle:
+        description: Bundle ID
+        required: true
+      from:
+        description: Product id to copy
+        required: true
+      to:
+        description: New product id
+        required: true
+      name:
+        description: New reference name (App Store Connect only)
+        required: true
+      base:
+        description: Base territory for prices
+        required: false
+        default: GBR
+permissions:
+  contents: read
+jobs:
+  copy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Copy the subscription
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          BUNDLE: ${{ inputs.bundle }}
+          FROM: ${{ inputs.from }}
+          TO: ${{ inputs.to }}
+          NAME: ${{ inputs.name }}
+          BASE: ${{ inputs.base }}
+        run: node .github/asc-copy-sub.mjs "$BUNDLE" "$FROM" "$TO" "$NAME" "$BASE"
