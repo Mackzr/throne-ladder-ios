@@ -76,7 +76,8 @@ jobs:
           ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
-        run: node asc-bundle-id.mjs "${{ inputs.bundle }}" "${{ inputs.name }}"
+        # The entitlements file (if the app has one) says which capabilities the App ID needs switched on.
+        run: node asc-bundle-id.mjs "${{ inputs.bundle }}" "${{ inputs.name }}" $(find app -name "*.entitlements" -not -path "*/node_modules/*" 2>/dev/null | head -1)
       # Archived unsigned (automatic signing here wants a development profile, which needs a registered iPhone); the export
       # signs it once for the App Store. Swift packages (Capacitor) resolve from GitHub and from app.zip's node_modules.
       - name: Archive
