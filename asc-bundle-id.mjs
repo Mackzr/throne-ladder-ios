@@ -30,3 +30,30 @@ else {
   const made = await api("POST", "/v1/bundleIds", { data: { type: "bundleIds", attributes: { identifier: bundle, name, platform: "IOS" } } });
   console.log("App ID registered:", bundle, made.data.id);
 }
+
+// Capabilities (D22): every capability the app's entitlements file asks for is switched on for the App ID, so the
+// export's cloud signing can make a profile that includes it. Optional third argument: the .entitlements file.
+//   node asc-bundle-id.mjs <bundle id> <name> [path/to/App.entitlements]
+const entPath = process.argv[4];
+if (entPath) {
+  const { execFileSync } = await import("node:child_process");
+  const ent = JSON.parse(execFileSync("/usr/bin/plutil", ["-convert", "json", "-o", "-", entPath], { encoding: "utf8" }));
+  const WANT = {
+    "com.apple.developer.applesignin": { capabilityType: "APPLE_ID_AUTH", settings: [{ key: "APPLE_ID_AUTH_APP_CONSENT", options: [{ key: "PRIMARY_APP_CONSENT" }] }] },
+    "com.apple.developer.associated-domains": { capabilityType: "ASSOCIATED_DOMAINS" },
+    "com.apple.developer.game-center": { capabilityType: "GAME_CENTER" },
+    "com.apple.developer.ubiquity-kvstore-identifier": { capabilityType: "ICLOUD", settings: [{ key: "ICLOUD_VERSION", options: [{ key: "XCODE_6", enabled: true }] }] },
+  };
+  const ids = await api("GET", `/v1/bundleIds?filter[identifier]=${encodeURIComponent(bundle)}&include=bundleIdCapabilities&limit=20`);
+  const b = (ids.data || []).find((x) => x.attributes.identifier === bundle);
+  if (!b) throw new Error("no App ID " + bundle);
+  const mine = new Set((b.relationships?.bundleIdCapabilities?.data ?? []).map((r) => r.id));
+  const have = new Set((ids.included ?? []).filter((c) => c.type === "bundleIdCapabilities" && mine.has(c.id)).map((c) => c.attributes.capabilityType));
+  for (const key of Object.keys(ent)) {
+    const cap = WANT[key];
+    if (!cap) continue;
+    if (have.has(cap.capabilityType)) { console.log(cap.capabilityType, "already on"); continue; }
+    await api("POST", "/v1/bundleIdCapabilities", { data: { type: "bundleIdCapabilities", attributes: cap, relationships: { bundleId: { data: { type: "bundleIds", id: b.id } } } } });
+    console.log(cap.capabilityType, "switched on for", bundle);
+  }
+}
