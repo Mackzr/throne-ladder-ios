@@ -54,13 +54,16 @@ for (const g of groups.data || []) {
     if (loc.error) show("localisations", loc.error);
     for (const l of loc.data || []) show("localisation", `${l.attributes.locale} "${l.attributes.name}" (${(l.attributes.description || "").length} ch) ${l.attributes.state}`);
 
-    const av = await get(`/v1/subscriptions/${s.id}/subscriptionAvailability?include=availableTerritories&limit[availableTerritories]=200`);
-    if (av.error) show("availability", av.error);
+    const av = await get(`/v1/subscriptions/${s.id}/subscriptionAvailability`);
+    if (av.error || !av.data) show("availability", av.error || "NOT SET");
     else {
-      const terr = (av.data?.relationships?.availableTerritories?.data || []).map((t) => t.id);
-      show("availability", `${terr.length} territories, ${territory} ${terr.includes(territory) ? "yes" : "NO"}, new territories ${av.data?.attributes?.availableInNewTerritories}`);
+      const terr = []; let next = `/v1/subscriptionAvailabilities/${av.data.id}/availableTerritories?limit=50`;
+      while (next) { const page = await get(next); if (page.error) { show("territories", page.error); break; }
+        terr.push(...(page.data || []).map((x) => x.id)); next = page.links?.next ? page.links.next.replace("https://api.appstoreconnect.apple.com", "") : null; }
+      show("availability", `${terr.length} territories, ${territory} ${terr.includes(territory) ? "yes" : "NO"}, new territories ${av.data.attributes?.availableInNewTerritories}`);
     }
-
+    const raw = await get(`/v1/subscriptions/${s.id}`);
+    show("all attributes", raw.error || raw.data?.attributes);
     const pr = await get(`/v1/subscriptions/${s.id}/prices?filter[territory]=${territory}&include=subscriptionPricePoint,territory&limit=20`);
     if (pr.error) show("prices", pr.error);
     else {
