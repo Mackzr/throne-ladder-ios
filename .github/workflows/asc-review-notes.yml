@@ -1,0 +1,36 @@
+# Reads (or, with sub_note, sets) the notes App Review reads for an app version and its subscriptions
+# (asc-review-notes.mjs). Never prints the demo account or contact details. Secrets: ASC_KEY_P8, ASC_KEY_ID, ASC_ISSUER_ID.
+name: Review notes
+run-name: Review notes ${{ inputs.bundle }} ${{ inputs.version }}
+on:
+  workflow_dispatch:
+    inputs:
+      bundle:
+        description: Bundle ID
+        required: true
+      version:
+        description: App version (e.g. 1.0)
+        required: true
+      sub_note:
+        description: New review note for every subscription (empty = only read)
+        required: false
+        default: ""
+permissions:
+  contents: read
+jobs:
+  notes:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Review notes
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          BUNDLE: ${{ inputs.bundle }}
+          VERSION: ${{ inputs.version }}
+          SUB_NOTE: ${{ inputs.sub_note }}
+        run: |
+          if [ -n "$SUB_NOTE" ]; then node .github/asc-review-notes.mjs "$BUNDLE" "$VERSION" --sub-note "$SUB_NOTE"
+          else node .github/asc-review-notes.mjs "$BUNDLE" "$VERSION"; fi
