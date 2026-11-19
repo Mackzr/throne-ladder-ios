@@ -1,0 +1,31 @@
+# READ-ONLY check of an app's subscriptions in App Store Connect (asc-subs-check.mjs): prints each subscription's
+# product id, state, localisations, availability, price in one territory, review screenshot and offers, so two plans
+# can be compared. Started by hand; changes nothing; no Mac needed. Secrets: ASC_KEY_P8, ASC_KEY_ID, ASC_ISSUER_ID.
+name: Subscription check
+run-name: Subscription check ${{ inputs.bundle }}
+on:
+  workflow_dispatch:
+    inputs:
+      bundle:
+        description: Bundle ID
+        required: true
+      territory:
+        description: Territory for prices (e.g. GBR)
+        required: false
+        default: GBR
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Read the subscriptions
+        env:
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          BUNDLE: ${{ inputs.bundle }}
+          TERRITORY: ${{ inputs.territory }}
+        run: node .github/asc-subs-check.mjs "$BUNDLE" "$TERRITORY"
